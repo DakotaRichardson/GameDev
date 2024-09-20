@@ -1,5 +1,7 @@
 const float screen_width = 320.0f;
 const float screen_height = 180.0f;
+const float paddle_padding = 20.0f;
+const float speed = 100.0f;
 
 Gfx_Font *
     font;
@@ -18,6 +20,9 @@ typedef struct Entity
     bool is_valid;
     EntityArchetype arch;
     Vector2 position;
+    Vector2 velocity;
+    Vector2 size;
+    Vector4 color;
 } Entity;
 
 #define MAX_ENTITY_COUNT 1024
@@ -61,7 +66,9 @@ void entity_destory(Entity *entity)
 void setup_player(Entity *en)
 {
     en->arch = arch_player;
-    en->position = v2(0, 0);
+    en->position = v2(-(screen_width / 2) + paddle_padding, 0);
+    en->size = v2(10, 40);
+    en->color = COLOR_WHITE;
 }
 
 int entry(int argc, char **argv)
@@ -103,6 +110,21 @@ int entry(int argc, char **argv)
             draw_frame.camera_xform = m4_mul(draw_frame.camera_xform, m4_make_scale(v3(1.0 / (window.pixel_width / screen_width), 1.0 / (window.pixel_height / screen_height), 1.0)));
         }
         /***************************************************************
+         * Player
+         ****************************************************************/
+        {
+            player_en->velocity.y = is_key_down('W') - is_key_down('S');
+            player_en->position = v2_add(player_en->position, v2_mulf(player_en->velocity, speed * delta_t));
+            if (player_en->position.y + player_en->size.y / 2 >= (screen_height / 2))
+            {
+                player_en->position.y = (screen_height / 2) - player_en->size.y / 2;
+            }
+            if (player_en->position.y - player_en->size.y / 2 <= (-screen_height / 2))
+            {
+                player_en->position.y = -(screen_height / 2) + player_en->size.y / 2;
+            }
+        }
+        /***************************************************************
          * Render Entities
          ****************************************************************/
         {
@@ -117,7 +139,8 @@ int entry(int argc, char **argv)
                     {
                         Matrix4 xform = m4_scalar(1.0);
                         xform = m4_translate(xform, v3(en->position.x, en->position.y, 0));
-                        draw_rect_xform(xform, v2(10.0, 10.0), COLOR_WHITE);
+                        xform = m4_translate(xform, v3(-en->size.x / 2, -en->size.y / 2, 0));
+                        draw_rect_xform(xform, en->size, en->color);
                         break;
                     }
                     }
