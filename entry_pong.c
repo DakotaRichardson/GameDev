@@ -11,6 +11,7 @@ typedef enum EntityArchetype
 {
     arch_nil = 0,
     arch_player = 1,
+    arch_ball = 2,
     ARCH_MAX,
 
 } EntityArchetype;
@@ -71,6 +72,24 @@ void setup_player(Entity *en)
     en->color = COLOR_WHITE;
 }
 
+void setup_ball(Entity *en)
+{
+    en->arch = arch_ball;
+    en->position = v2(0, 0);
+    en->velocity = v2(-1, 1);
+    en->size = v2(5, 5);
+    en->color = COLOR_WHITE;
+}
+
+bool is_colliding(Entity *a, Entity *b)
+{
+    bool colliding = (a->position.x - (a->size.x / 2) < b->position.x + (b->size.x / 2) &&
+                      a->position.x + (a->size.x / 2) > b->position.x - (b->size.x / 2) &&
+                      a->position.y - (a->size.y / 2) < b->position.y + (b->size.y / 2) &&
+                      a->position.y + (a->size.y / 2) > b->position.y - (b->size.y / 2));
+    return colliding;
+}
+
 int entry(int argc, char **argv)
 {
 
@@ -87,6 +106,9 @@ int entry(int argc, char **argv)
 
     Entity *player_en = entity_create();
     setup_player(player_en);
+
+    Entity *ball_en = entity_create();
+    setup_ball(ball_en);
 
     float64 last_time = os_get_elapsed_seconds();
 
@@ -122,6 +144,26 @@ int entry(int argc, char **argv)
             if (player_en->position.y - player_en->size.y / 2 <= (-screen_height / 2))
             {
                 player_en->position.y = -(screen_height / 2) + player_en->size.y / 2;
+            }
+        }
+        /***************************************************************
+         * Ball
+         ****************************************************************/
+        {
+            ball_en->velocity = v2_normalize(ball_en->velocity);
+            ball_en->position = v2_add(ball_en->position, v2_mulf(ball_en->velocity, (1 * speed) * delta_t));
+            if (ball_en->position.y + (ball_en->size.y / 2) >= (screen_height / 2) || ball_en->position.y - (ball_en->size.y / 2) <= -(screen_height / 2))
+            {
+                ball_en->velocity.y *= -1;
+                ball_en->position.y = screen_height / 2 * ball_en->position.y / fabsf(ball_en->position.y) + (ball_en->size.y / 2) * (ball_en->position.y > 0 ? -1 : 1);
+            }
+            if (ball_en->position.x + (ball_en->size.x / 2) >= (screen_width / 2))
+            {
+                ball_en->position = v2(0, 0);
+            }
+            if (ball_en->position.x - (ball_en->size.x / 2) <= -(screen_width / 2))
+            {
+                ball_en->position = v2(0, 0);
             }
         }
         /***************************************************************
