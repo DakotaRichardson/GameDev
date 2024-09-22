@@ -2,6 +2,7 @@ const float screen_width = 320.0f;
 const float screen_height = 180.0f;
 const float paddle_padding = 20.0f;
 const float speed = 100.0f;
+const float ai_range = 15.0f;
 
 Gfx_Font *
     font;
@@ -12,6 +13,7 @@ typedef enum EntityArchetype
     arch_nil = 0,
     arch_player = 1,
     arch_ball = 2,
+    arch_enemy = 3,
     ARCH_MAX,
 
 } EntityArchetype;
@@ -81,6 +83,14 @@ void setup_ball(Entity *en)
     en->color = COLOR_WHITE;
 }
 
+void setup_enemy(Entity *en)
+{
+    en->arch = arch_enemy;
+    en->size = v2(10, 40);
+    en->position = v2((screen_width / 2) - paddle_padding, 0);
+    en->color = COLOR_WHITE;
+}
+
 bool is_colliding(Entity *a, Entity *b)
 {
     bool colliding = (a->position.x - (a->size.x / 2) < b->position.x + (b->size.x / 2) &&
@@ -110,7 +120,12 @@ int entry(int argc, char **argv)
     Entity *ball_en = entity_create();
     setup_ball(ball_en);
 
+    Entity *enemy_en = entity_create();
+    setup_enemy(enemy_en);
+
     float64 last_time = os_get_elapsed_seconds();
+    bool bounced = false;
+    float targetY = 0;
 
     while (!window.should_close)
     {
@@ -122,6 +137,7 @@ int entry(int argc, char **argv)
         }
         float64 delta_t = now - last_time;
         last_time = now;
+        bounced = false;
 
         /***************************************************************
          * Camera
@@ -156,14 +172,51 @@ int entry(int argc, char **argv)
             {
                 ball_en->velocity.y *= -1;
                 ball_en->position.y = screen_height / 2 * ball_en->position.y / fabsf(ball_en->position.y) + (ball_en->size.y / 2) * (ball_en->position.y > 0 ? -1 : 1);
+                bounced = true;
             }
             if (ball_en->position.x + (ball_en->size.x / 2) >= (screen_width / 2))
             {
                 ball_en->position = v2(0, 0);
+                bounced = true;
             }
             if (ball_en->position.x - (ball_en->size.x / 2) <= -(screen_width / 2))
             {
                 ball_en->position = v2(0, 0);
+                bounced = true;
+            }
+        }
+        /***************************************************************
+         * Enemy AI
+         ****************************************************************/
+        {
+            if (bounced)
+            {
+                float distanceY = ball_en->position.y - enemy_en->position.y;
+                float timeToReachPaddle = (enemy_en->position.x - ball_en->position.x) / ball_en->velocity.x;
+                float projectedBallY = ball_en->position.y + ball_en->velocity.y * timeToReachPaddle;
+                float angleOffset = get_random_float32_in_range(-ai_range, ai_range) * (M_PI / 180.f);
+                float adjustmentY = tan(angleOffset) * fabs(enemy_en->position.x - ball_en->position.x);
+
+                targetY = projectedBallY + adjustmentY;
+            }
+            if (!(enemy_en->position.y + get_random_float32_in_range(0, enemy_en->size.y / 2) > targetY && enemy_en->position.y - get_random_float32_in_range(0, enemy_en->size.y / 2) < targetY))
+            {
+                if (enemy_en->position.y < targetY)
+                {
+                    enemy_en->position.y += speed * delta_t; // Move up
+                }
+                else if (enemy_en->position.y > targetY)
+                {
+                    enemy_en->position.y -= speed * delta_t; // Move down
+                }
+            }
+            if (enemy_en->position.y + enemy_en->size.y / 2 >= (screen_height / 2))
+            {
+                enemy_en->position.y = (screen_height / 2) - enemy_en->size.y / 2;
+            }
+            if (enemy_en->position.y - enemy_en->size.y / 2 <= (-screen_height / 2))
+            {
+                enemy_en->position.y = -(screen_height / 2) + enemy_en->size.y / 2;
             }
         }
         /***************************************************************
